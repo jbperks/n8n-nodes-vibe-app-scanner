@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-vibe-app-scanner",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "Start authorized VAS deployment scans and read coverage-safe scan summaries",
   "license": "MIT",
   "homepage": "https://vibeappscanner.com",
@@ -15,7 +15,13 @@
     "build": "n8n-node build",
     "lint": "n8n-node lint",
     "test": "node --test test/*.test.cjs",
-    "prepublishOnly": "node -e \"throw new Error('Local prototype: publication requires explicit approval and release review')\""
+    "prepublishOnly": "node scripts/release-guard.cjs",
+    "check:package": "node scripts/check-package.cjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/",
+    "provenance": true
   },
   "files": ["dist"],
   "n8n": {

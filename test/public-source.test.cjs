@@ -9,13 +9,13 @@ test('standalone source metadata points only to the public integration repositor
   const pkg = JSON.parse(read('package.json'));
   assert.equal(pkg.repository.url, 'https://github.com/jbperks/n8n-nodes-vibe-app-scanner.git');
   assert.equal(pkg.repository.directory, undefined);
-  assert.equal(pkg.private, true);
-  assert.match(pkg.scripts.prepublishOnly, /throw new Error/);
+  assert.equal(pkg.private, false);
+  assert.equal(pkg.scripts.prepublishOnly, 'node scripts/release-guard.cjs');
   assert.equal(pkg.scripts.release, undefined);
   for (const path of ['README.md', 'credentials/VibeAppScannerApi.credentials.ts', 'nodes/VibeAppScanner/VibeAppScanner.node.json']) {
     assert.doesNotMatch(read(path), /github\.com\/jbperks\/vas(?:[/.#]|$)|\/Users\//);
   }
-  assert.match(read('README.md'), /Not published on npm or verified by n8n/);
+  assert.match(read('README.md'), /not verified by n8n/);
 });
 
 test('example keeps scanning disabled and uses no real account or credential identifiers', () => {

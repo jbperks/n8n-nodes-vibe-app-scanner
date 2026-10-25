@@ -1,8 +1,12 @@
 # Vibe App Scanner for n8n
 
-**Public source preview. Not published on npm or verified by n8n.** The package is deliberately marked private and publication is blocked until a separate release review. There is no n8n Cloud install offer yet.
+**Native community node; not verified by n8n.** Self-hosted installation requires a published [npm version](https://www.npmjs.com/package/n8n-nodes-vibe-app-scanner). A staged release or public repository alone is not installable. n8n Cloud discovery requires n8n's separate review and approval.
 
-The VAS deployment-scan API is live. An authorized manual n8n Cloud pilot has exercised API admission, status polling and Slack delivery using HTTP Request nodes. That result does not establish that this native package is published, installable on Cloud or independently live-validated. The native node has synthetic unit and isolated runtime test coverage; standalone packaging checks remain part of its release process.
+The VAS deployment-scan API is live. An authorized manual n8n Cloud pilot has exercised API admission, status polling and Slack delivery using HTTP Request nodes. That result does not establish native Cloud installation. The standalone native archive has also passed synthetic unit tests and an isolated n8n 2.44.6 runtime test with mocked transport; no live scans were started by those tests.
+
+## Installation
+
+Once the npm version is public, self-hosted n8n administrators can install `n8n-nodes-vibe-app-scanner` through **Settings → Community nodes**, following [n8n's community-node installation instructions](https://docs.n8n.io/integrations/community-nodes/installation/gui-install/). Review the source and use a disposable instance first. Installing an unverified community node runs third-party code in your n8n instance. This package does not yet have n8n verification or an n8n Cloud install offer.
 
 This community node integrates VAS website standard/quick scans with n8n. It does not scan GitHub/ZIP repositories, run deep scans, add an AI agent, change billing or start replacement scans.
 
@@ -45,7 +49,7 @@ Each operation performs one request per input item. Use n8n's existing Wait and 
 
 For Slack or another notifier, map `summary` and `reportUrl` from Get Scan Summary. Prefer plain-text delivery and disable mentions/unfurls where available. Notification redelivery is a separate concern: retry only the notification after an ambiguous send, not the whole workflow with a new deployment ID. No exactly-once notification guarantee is included.
 
-An inactive, disabled [native-node workflow example](examples/deployment-to-slack.json) combines these operations with authenticated webhook ingress, deployment filtering, bounded Wait/IF polling and Slack. Follow [the example configuration instructions](examples/README.md): the fixed target/namespace/consent live on the Create node, while the allowlist and enable flag live in Configuration. Automatic creation/read retries are disabled; read errors stop with uncertainty. The package is not published or n8n-verified, so this is a development example, not a production install offer.
+An inactive, disabled [native-node workflow example](https://github.com/jbperks/n8n-nodes-vibe-app-scanner/blob/main/examples/deployment-to-slack.json) combines these operations with authenticated webhook ingress, deployment filtering, bounded Wait/IF polling and Slack. Follow [the example configuration instructions](https://github.com/jbperks/n8n-nodes-vibe-app-scanner/blob/main/examples/README.md): the fixed target/namespace/consent live on the Create node, while the allowlist and enable flag live in Configuration. Automatic creation/read retries are disabled; read errors stop with uncertainty. Review the example in a disposable instance before configuring real credentials or enabling scanning.
 
 Output deliberately excludes finding descriptions/evidence, source, target credentials, raw scanner/provider errors, response headers and arbitrary upstream strings. Independent finding counts remain visible alongside incomplete coverage. Missing/malformed counts and absent coverage are `null`/unknown, not zero. Nonterminal counts are not treated as final. Completed bounded samples, skipped/not-applicable checks and failures remain distinct. Completion or zero findings never establishes that an app is secure.
 
@@ -73,15 +77,17 @@ npm test
 
 Build with Node 24+; the local native runtime check targets n8n 2.44.6 (`n8n-workflow` 2.44.2). n8n requires the peer range `*` for community packages; this does not claim every n8n version has been tested. Strict community lint uses the unmodified default configuration, with no rule suppressions.
 
-For a local editor preview only, use a disposable n8n profile and set `N8N_CUSTOM_EXTENSIONS` to this package's built `dist` directory. n8n loads the development node as `CUSTOM.vibeAppScanner`; a published installed package would use `n8n-nodes-vibe-app-scanner.vibeAppScanner`. The example workflow uses the future published identifier for its creation and status nodes; its Code node formats the notification from the status result. For a disposable development preview, change only those two VAS node types to `CUSTOM.vibeAppScanner`. Do not load it into an existing production n8n profile or run it with real credentials yet.
+For a local editor preview only, use a disposable n8n profile and set `N8N_CUSTOM_EXTENSIONS` to this package's built `dist` directory. n8n loads the development node as `CUSTOM.vibeAppScanner`; an npm-installed package uses `n8n-nodes-vibe-app-scanner.vibeAppScanner`. The example workflow uses the npm identifier for its creation and status nodes; its Code node formats the notification from the status result. For a disposable development preview, change only those two VAS node types to `CUSTOM.vibeAppScanner`. Do not use an existing production profile for development tests.
 
 The synthetic unit tests mock the n8n transport helper and make no network requests. They exercise permission checks, stable deployment identity, prevalidation, request bounds, sanitized failures, paired items and preservation of findings counts with incomplete coverage. The migration-contract fixture uses synthetic data and has no private-repository dependency.
 
-Earlier isolated runtime tests exercised this node on n8n 2.44.6 with mocked loopback transport. Those harnesses are not required by this standalone unit suite. A fresh packaged-install runtime check is still a release gate; see [the release checklist](RELEASING.md). Real webhook authentication, long-wait restart/resume, native credential access and n8n verification remain separate checks.
+The standalone npm archive passed 15 isolated n8n 2.44.6 scenarios with synthetic credentials, mocked loopback VAS/Slack transport and non-loopback network access blocked. The archive was unpacked and loaded through n8n's development loader; this is not a public-registry installation or Cloud verification test. Real webhook authentication, long-wait restart/resume and native production credential access remain separate checks. See [the release checklist](https://github.com/jbperks/n8n-nodes-vibe-app-scanner/blob/main/RELEASING.md).
 
 ## Release boundary
 
-No npm publish/release script or GitHub publishing workflow is enabled. This repository contains only the integration source, documentation, examples and synthetic tests; it does not contain the VAS backend or application history. Before publication, confirm npm ownership, review the standalone package, pass the release checks, enable publication deliberately, and publish from GitHub Actions with npm provenance before requesting n8n verification. Cloud discovery is not automatic and verification is not guaranteed. No client scan or VAS deployment is authorized by running these local checks.
+Publication uses the manually dispatched `publish.yml` workflow on an exact version tag. It reruns the build, strict lint, synthetic tests and archive checks, then stages the archive on npm with provenance. Staging does not make a version public: a maintainer must approve it using npm 2FA. The local prepublish guard helps prevent accidental publication; it is not a substitute for npm/GitHub access controls. The one-time stage-only bootstrap credential is revoked after release, and future releases need separately authorized publishing access.
+
+This repository contains only the integration source, documentation, examples and synthetic tests, not the VAS backend or application history. Cloud discovery is not automatic and verification is not guaranteed. No client scan or VAS deployment is authorized by running these checks.
 
 Official references:
 
