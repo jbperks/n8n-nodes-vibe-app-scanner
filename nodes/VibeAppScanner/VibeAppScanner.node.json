@@ -1,0 +1,10 @@
+{
+  "node": "n8n-nodes-vibe-app-scanner.vibeAppScanner",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": ["Development"],
+  "resources": {
+    "credentialDocumentation": [{ "url": "https://github.com/jbperks/n8n-nodes-vibe-app-scanner#credentials" }],
+    "primaryDocumentation": [{ "url": "https://github.com/jbperks/n8n-nodes-vibe-app-scanner" }]
+  }
+}

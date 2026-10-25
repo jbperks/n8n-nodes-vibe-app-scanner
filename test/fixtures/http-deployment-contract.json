@@ -1,0 +1,16 @@
+{
+  "description": "Synthetic migration fixture, independently checked against the VAS HTTP workflow contract before public source export.",
+  "parameters": {
+    "operation": "startDeploymentScan",
+    "targetUrl": "https://app.example.test",
+    "eventNamespace": "test-app",
+    "deploymentId": "deployment-0001",
+    "ownershipConfirmed": true,
+    "termsAccepted": true
+  },
+  "expected": {
+    "key": "n8n:v1:test-app:deployment-0001",
+    "targetUrl": "https://app.example.test",
+    "termsVersion": "1.0"
+  }
+}

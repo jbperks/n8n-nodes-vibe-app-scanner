@@ -1,0 +1,453 @@
+{
+  "name": "VAS native node: approved deployment to scan and Slack (local prototype)",
+  "active": false,
+  "nodes": [
+    {
+      "id": "deployment-webhook",
+      "name": "Deployment webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vas-deployment-prototype",
+        "authentication": "headerAuth",
+        "responseMode": "onReceived",
+        "options": {
+          "responseCode": 202
+        }
+      },
+      "webhookId": "vas-deployment-prototype",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_DEPLOYMENT_CREDENTIAL",
+          "name": "Deployment webhook secret"
+        }
+      }
+    },
+    {
+      "id": "configuration",
+      "name": "Configuration",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const config = (function communityConfiguration(parameters) {\n  if (parameters.operation !== 'startDeploymentScan') throw new Error('Configure the branded Create node for Start Deployment Scan.');\n  return { enabled: false, ownershipConfirmed: parameters.ownershipConfirmed, termsAccepted: parameters.termsAccepted,\n    termsVersion: '1.0', slackChannel: 'C_REPLACE_ME', maxPolls: 30, maxMinutes: 20,\n    projects: { 'example-app': { origin: parameters.targetUrl, environment: 'production', eventNamespace: parameters.eventNamespace } } };\n})($('Create deployment scan').params); return [{json:config}];"
+      }
+    },
+    {
+      "id": "validate-deployment",
+      "name": "Validate deployment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const event=$('Deployment webhook').first().json.body; const result=(function validateDeployment(event, config, now = Date.now()) {\n  const wholeMatch = (value, pattern) => typeof value === 'string' && pattern.exec(value)?.[0] === value;\n  if (config.enabled !== true || config.ownershipConfirmed !== true || config.termsAccepted !== true || config.termsVersion !== '1.0') {\n    throw new Error('Scanning is disabled. Confirm target permission, accept VAS scanning terms and enable this workflow in configuration.');\n  }\n  if (!event || typeof event !== 'object' || Array.isArray(event)) throw new Error('Provide one normalized deployment event.');\n  const project = Object.hasOwn(config.projects, event.project) ? config.projects[event.project] : undefined;\n  if (!project || event.environment !== project.environment || event.status !== 'succeeded') {\n    return { accepted: false }; // Unknown projects, previews and unsuccessful deploys cannot choose a URL.\n  }\n  if (!wholeMatch(event.eventId, /^[A-Za-z0-9][A-Za-z0-9:._/-]{0,79}$/) ||\n      !wholeMatch(project.eventNamespace, /^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$/)) {\n    throw new Error('Provide a stable deployment ID and a configured event namespace. Keep the same ID on every retry.');\n  }\n  // No URL global is required in n8n's Code sandbox. Backend URL/DNS validation remains authoritative.\n  if (!wholeMatch(project.origin, /^https:\\/\\/[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?\\.[a-z]{2,}\\/?$/i)) {\n    throw new Error('Configure a fixed HTTPS app origin without credentials, port, path, query or fragment.');\n  }\n  if (!wholeMatch(config.slackChannel, /^C[A-Z0-9]{8,}$/) || config.slackChannel.includes('REPLACE')) {\n    throw new Error('Configure the approved Slack channel ID.');\n  }\n  if (!Number.isInteger(config.maxPolls) || config.maxPolls < 1 || config.maxPolls > 40 ||\n      !Number.isInteger(config.maxMinutes) || config.maxMinutes < 1 || config.maxMinutes > 30) {\n    throw new Error('Choose 1–40 status checks and a 1–30 minute time limit.');\n  }\n  return { accepted: true, key: `n8n:v1:${project.eventNamespace}:${event.eventId}`, targetUrl: project.origin.replace(/\\/$/, ''),\n    termsVersion: config.termsVersion, slackChannel: config.slackChannel,\n    maxPolls: config.maxPolls, deadline: now + config.maxMinutes * 60_000 };\n})(event,$input.first().json); return [{json:result.accepted ? {...result,deploymentId:event.eventId} : result}];"
+      }
+    },
+    {
+      "id": "approved-deployment",
+      "name": "Approved deployment",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Approved deployment-condition",
+              "leftValue": "={{ $json.accepted }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "create-deployment-scan",
+      "name": "Create deployment scan",
+      "type": "n8n-nodes-vibe-app-scanner.vibeAppScanner",
+      "typeVersion": 1,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "operation": "startDeploymentScan",
+        "targetUrl": "https://app.example.com",
+        "eventNamespace": "provider-example-app",
+        "deploymentId": "={{ $(\"Validate deployment\").item.json.deploymentId }}",
+        "ownershipConfirmed": false,
+        "termsAccepted": false
+      },
+      "credentials": {
+        "vibeAppScannerApi": {
+          "id": "REPLACE_VAS_CREDENTIAL",
+          "name": "VAS API: scan:create + scan:read"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "remember-scan",
+      "name": "Remember scan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:(function acceptCreation(response, deployment) {\n  const scanId = response?.body?.scanId;\n  if (!Number.isInteger(response?.statusCode) || response.statusCode < 200 || response.statusCode >= 300 ||\n      response.body?.contract !== 'deployment-scan-v1' ||\n      typeof scanId !== 'string' || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.exec(scanId)?.[0] !== scanId) {\n    // Do not echo provider bodies, credentials, target evidence or unknown HTML error pages.\n    throw new Error('VAS did not confirm this deployment scan. Check API access, allowance and endpoint availability; retry with the SAME deployment ID. Do not fall back to /scans.');\n  }\n  return { ...deployment, scanId: response.body.scanId, reused: response.body.deduplicated === true, polls: 0 };\n})({statusCode:200,body:$input.first().json},$('Validate deployment').item.json)}];"
+      }
+    },
+    {
+      "id": "wait-before-status",
+      "name": "Wait before status",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "webhookId": "vas-deployment-wait"
+    },
+    {
+      "id": "read-scan-status",
+      "name": "Read scan status",
+      "type": "n8n-nodes-vibe-app-scanner.vibeAppScanner",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "operation": "getScanStatus",
+        "scanId": "={{ $json.scanId }}"
+      },
+      "credentials": {
+        "vibeAppScannerApi": {
+          "id": "REPLACE_VAS_CREDENTIAL",
+          "name": "VAS API: scan:create + scan:read"
+        }
+      },
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "inspect-status",
+      "name": "Inspect status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json:(function inspectCommunityStatus(result, state, now = Date.now()) {\n  const base = { ...state, polls: state.polls + 1, pollAgain: false };\n  if (!result || typeof result !== 'object' || typeof result.error === 'string') return { ...base, outcome: 'status-unavailable' };\n  const terminal = ['completed', 'failed', 'cancelled', 'timeout', 'timed_out'];\n  if (result.scanId !== state.scanId || ![...terminal, 'queued', 'running', 'processing'].includes(result.status) ||\n      result.terminal !== terminal.includes(result.status)) return { ...base, outcome: 'invalid-status' };\n  if (!result.terminal) return base.polls < state.maxPolls && now < state.deadline\n    ? { ...base, pollAgain: true } : { ...base, outcome: 'wait-limit' };\n  const number = value => Number.isSafeInteger(value) && value >= 0 ? value : null;\n  return { ...base, outcome: result.status,\n    counts: { total: number(result.counts?.total), critical: number(result.counts?.critical), high: number(result.counts?.high) },\n    coverage: { pageCoverage: typeof result.coverage?.pageCoverage === 'string' ? result.coverage.pageCoverage : 'unknown',\n      reportedChecks: number(result.coverage?.reportedChecks), incompleteChecks: number(result.coverage?.incompleteChecks),\n      skippedChecks: number(result.coverage?.skippedChecks), boundedChecks: number(result.coverage?.boundedChecks) },\n    reportLocked: result.reportAccess !== 'available' };\n})($input.first().json,$('Wait before status').item.json)}];"
+      }
+    },
+    {
+      "id": "keep-waiting",
+      "name": "Keep waiting",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "Keep waiting-condition",
+              "leftValue": "={{ $json.pollAgain }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "build-slack-summary",
+      "name": "Build Slack summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{json: (function buildSummary(state) {\n  const labels = { completed: 'Scan completed', failed: 'Scan failed', cancelled: 'Scan cancelled', timeout: 'Scan timed out',\n    timed_out: 'Scan timed out', 'wait-limit': 'Stopped waiting; scan may still be running',\n    'status-unavailable': 'Scan status could not be confirmed', 'access-blocked': 'VAS access needs attention',\n    'report-unavailable': 'Report unavailable', 'invalid-status': 'Scan status could not be verified' };\n  const lines = [`VAS: ${labels[state.outcome] ?? 'Scan result unknown'}.`, `App: ${state.targetUrl}`];\n  if (['completed', 'failed', 'cancelled', 'timeout', 'timed_out'].includes(state.outcome)) {\n    const number = n => n === null || n === undefined ? 'unknown' : String(n);\n    lines.push(`Findings reported: ${number(state.counts?.total)}; critical: ${number(state.counts?.critical)}; high: ${number(state.counts?.high)}.`);\n    const pageLabels = { unclassified: 'Application scope not classified', 'login-page': 'Login page only',\n      'blocked-page': 'Application behind a blocked page was not assessed', 'placeholder-only': 'Placeholder content only',\n      'parked-domain': 'Parked domain only', unreachable: 'Application unreachable',\n      'reachability-unconfirmed': 'Application reachability not confirmed' };\n    lines.push(`Coverage: ${pageLabels[state.coverage?.pageCoverage] ?? 'Application coverage unknown'}.`);\n    lines.push(`Checks incomplete or unsuccessful: ${number(state.coverage?.incompleteChecks)} of ${number(state.coverage?.reportedChecks)} reported.`);\n    if (state.coverage?.skippedChecks) lines.push(`Checks skipped or not applicable: ${state.coverage.skippedChecks}. These checks were not assessed.`);\n    if (state.coverage?.boundedChecks) lines.push(`Checks limited to a bounded sample: ${state.coverage.boundedChecks}.`);\n    if (state.reportLocked) lines.push('Detailed report access is not confirmed. Check your VAS account permissions.');\n    lines.push('Completion and zero findings do not establish that the app is secure. Review report coverage and unresolved checks.');\n  }\n  if (state.outcome !== 'completed') lines.push('This is not a clean scan result. Inspect the existing scan; no replacement scan was started.');\n  if (state.reused) lines.push('Reused the original scan for this deployment event.');\n  // UUID was verified before interpolation; nothing from finding text or provider errors is included.\n  lines.push(`Report: https://vibeappscanner.com/dashboard/scans/${state.scanId}`);\n  return { channel: state.slackChannel, text: lines.join('\\n'), mrkdwn: false, parse: 'none',\n    link_names: false, unfurl_links: false, unfurl_media: false };\n})($input.first().json)}];"
+      }
+    },
+    {
+      "id": "send-slack-summary",
+      "name": "Send Slack summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        160
+      ],
+      "parameters": {
+        "url": "https://slack.com/api/chat.postMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {
+          "timeout": 15000,
+          "redirect": {
+            "redirect": {
+              "followRedirects": false
+            }
+          },
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "json",
+              "neverError": true
+            }
+          }
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "REPLACE_SLACK_CREDENTIAL",
+          "name": "Slack bot: chat:write"
+        }
+      },
+      "retryOnFail": false
+    },
+    {
+      "id": "confirm-slack-delivery",
+      "name": "Confirm Slack delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2640,
+        160
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const r = $input.first().json; if (r.statusCode !== 200 || r.body?.ok !== true) throw new Error('Slack delivery was not confirmed. Check the Slack credential and channel, then retry only the notification step.'); return [{json:{notification:'sent'}}];"
+      }
+    },
+    {
+      "id": "read-before-enabling",
+      "name": "Read before enabling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -330
+      ],
+      "parameters": {
+        "content": "## Native-node example — inactive\nRequires the VAS community package; it is not published or n8n-verified yet.\n1. Configure the fixed app, namespace and permission/terms on Create deployment scan.\n2. Set project/environment, Slack channel and enabled in Configuration.\n3. Bind webhook, VAS and Slack credentials in n8n.\nNo automatic create retries or replacement scans. Read errors stop polling with uncertainty. See examples/README.md in the public integration repository.",
+        "height": 280,
+        "width": 670
+      }
+    }
+  ],
+  "connections": {
+    "Deployment webhook": {
+      "main": [
+        [
+          {
+            "node": "Configuration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configuration": {
+      "main": [
+        [
+          {
+            "node": "Validate deployment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate deployment": {
+      "main": [
+        [
+          {
+            "node": "Approved deployment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved deployment": {
+      "main": [
+        [
+          {
+            "node": "Create deployment scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create deployment scan": {
+      "main": [
+        [
+          {
+            "node": "Remember scan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remember scan": {
+      "main": [
+        [
+          {
+            "node": "Wait before status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait before status": {
+      "main": [
+        [
+          {
+            "node": "Read scan status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read scan status": {
+      "main": [
+        [
+          {
+            "node": "Inspect status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inspect status": {
+      "main": [
+        [
+          {
+            "node": "Keep waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Keep waiting": {
+      "main": [
+        [
+          {
+            "node": "Wait before status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Slack summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Slack summary": {
+      "main": [
+        [
+          {
+            "node": "Send Slack summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Slack summary": {
+      "main": [
+        [
+          {
+            "node": "Confirm Slack delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 2400,
+    "saveDataSuccessExecution": "none",
+    "saveDataErrorExecution": "none",
+    "saveManualExecutions": false,
+    "saveExecutionProgress": false
+  },
+  "pinData": {},
+  "tags": []
+}
