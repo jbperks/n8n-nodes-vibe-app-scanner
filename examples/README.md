@@ -1,10 +1,10 @@
 # Deployment-to-Slack example
 
-The [example workflow](deployment-to-slack.json) is inactive and scanning is disabled. It uses the native VAS node for creation and status reads, not a generic HTTP Request node for VAS calls. A Code node formats the notification from the returned status. The native package must be installed before n8n can recognize its two VAS nodes. It is not published or n8n-verified yet.
+The [example workflow](deployment-to-slack.json) is inactive and scanning is disabled. It uses the native VAS node for creation and status reads, not a generic HTTP Request node for VAS calls. A Code node formats the notification from the returned status. Install a published npm version before n8n can recognize its two VAS nodes. This package is not n8n-verified; Cloud discovery requires separate approval.
 
 ## Configure before use
 
-1. Use a disposable development n8n instance for now. For a source preview loaded through `N8N_CUSTOM_EXTENSIONS`, replace the two `n8n-nodes-vibe-app-scanner.vibeAppScanner` node types with `CUSTOM.vibeAppScanner`. Do not import into a production instance before release validation.
+1. Review the workflow in a disposable n8n instance first. For a source preview loaded through `N8N_CUSTOM_EXTENSIONS`, replace the two `n8n-nodes-vibe-app-scanner.vibeAppScanner` node types with `CUSTOM.vibeAppScanner`.
 2. On **Create deployment scan**, select **Start Deployment Scan**. Configure one fixed authorized HTTPS app origin and event namespace. Keep the namespace unchanged across redeliveries. Ownership and terms controls ship false; only the authorized operator may enable them after reviewing the [VAS scanning terms](https://vibeappscanner.com/terms).
 3. In **Configuration**, set the approved deployment project/environment and Slack channel ID. Configuration reads the fixed target, namespace and consent directly from Create deployment scan's `.params`; do not add a second target or accept one from an incoming event. Leave `enabled` false until authorization and the upstream event checks are ready.
 4. Bind separate credentials for the deployment webhook, VAS and Slack. Use a VAS account eligible for REST API access with `scan:create` and `scan:read`. For Slack, use a dedicated bot with `chat:write` and invite it only to the intended channel. Never enter keys in Code nodes, expressions, event bodies or exported workflow JSON.

@@ -1,28 +1,29 @@
 # Release checklist
 
-This public repository contains only the VAS n8n integration. The VAS application and backend source are not included.
+This public repository contains only the VAS n8n integration, not the private VAS application or its history.
 
-## Current status
+## Release gates
 
-- Public source preparation: complete once the initial repository upload is verified.
-- npm publication: blocked by `private: true` and the deliberate `prepublishOnly` guard.
-- n8n verification: not submitted. A public repository alone does not make a node available in n8n Cloud.
-- Publishing credentials and owner: not configured. Do not commit tokens or credentials.
+1. Confirm the npm owner (`vibeappscanner`), public MIT source and repository metadata. Review the exact source, README, examples and npm archive for secrets or private application data.
+2. Run `npm ci --ignore-scripts --no-audit --no-fund`, `npm run build`, `npm run lint`, `npm test` and `npm run check:package` in this standalone repository.
+3. Test the actual npm archive in a disposable n8n instance with synthetic credentials and mocked transport. The 0.1.0 candidate passed 15 scenarios on n8n 2.44.6 through its development loader with non-loopback traffic blocked. This does not establish registry installation, native Cloud availability or live production credential access.
+4. Review the release diff and commit it to the public repository. Tag that exact commit `v<package version>`. No runtime changes or private source are added by the publishing workflow.
+5. Manually dispatch `.github/workflows/publish.yml` on that tag with the matching `version` input. The workflow reruns the checks and stages the package with provenance. It never directly approves/publishes a staged version. It does not run on pushes or pull requests.
+6. Inspect the staged version, archive integrity and GitHub Actions provenance. An npm maintainer approves the exact candidate with their own 2FA. A staged version is not public, and an ambiguous staging response must be inspected before retrying.
+7. Verify the public npm version, archive, repository/commit metadata and provenance. Do not advertise installation until this succeeds.
+8. Submit the npm URL through the n8n Creator Portal. Submission is not verification. Wait for n8n approval before claiming Cloud discovery or verified status.
+9. Revoke the one-time stage-only npm bootstrap token and delete `NPM_STAGE_TOKEN` from this repository's encrypted Actions secrets. Verify both removals. Future trusted-publisher configuration is a separate security-sensitive grant, not automatic.
 
-## Before the first npm release
+## Publishing controls
 
-1. Confirm the npm account or organization that will own `n8n-nodes-vibe-app-scanner`. Align the npm maintainer and repository author metadata.
-2. Review the exact exported source, license, README, examples and npm package file list. Check that no account data, secrets, private application code or private Git history is included.
-3. Run `npm ci --ignore-scripts --no-audit --no-fund`, `npm run build`, `npm run lint` and `npm test` from this standalone repository. Review an `npm pack --dry-run --json --ignore-scripts` result.
-4. Run the packaged native node in an isolated disposable n8n instance with synthetic credentials and mocked transport. An HTTP Request workflow test is not a native package installation test.
-5. Add and review a GitHub Actions publishing workflow with npm provenance, following the current n8n requirements. Configure trusted publishing or an appropriately scoped publisher credential. Never commit that credential. No publishing workflow is enabled in this source-preparation stage.
-6. Deliberately remove `private: true` and the publication guard in a separate reviewed release change. Update the package-boundary tests at the same time. Keep the runtime permission, privacy and coverage tests.
-7. Publish from GitHub Actions with provenance. Verify the actual public npm archive and its source/repository metadata before advertising installation.
-8. Submit the published package through the n8n Creator Portal. Wait for n8n's review before claiming verified status or n8n Cloud discovery.
+The first release uses a temporary stage-only granular token with no organization access or 2FA bypass. The GitHub secret is exposed only to the staging step, not installation, build or tests. The workflow uses pinned actions, read-only repository access and an OIDC identity for provenance, with no release dependency cache or persisted checkout credentials.
 
-No client scans, account creation, allowance changes, billing changes or VAS deployment are required for these local checks.
+The source-only prepublish guard requires the canonical manually dispatched workflow, matching version tag, commit and registry. It prevents common accidental local releases but is not a security boundary against someone who can edit source or spoof environment variables. npm/GitHub permissions remain authoritative. No automatic version bump, merge, tag push or release approval script is provided.
+
+No client scans, account creation, allowance changes, billing changes or VAS deployment are required by these checks.
 
 ## Official references
 
 - [Submit community nodes](https://docs.n8n.io/connect/create-nodes/deploy-your-node/submit-community-nodes.md)
 - [Verification guidelines](https://docs.n8n.io/connect/create-nodes/build-your-node/reference/verification-guidelines.md)
+- [npm staged publishing](https://docs.npmjs.com/cli/v11/commands/npm-stage/)

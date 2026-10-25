@@ -37,10 +37,10 @@ function context(params, responses, { size = 1, values = {}, keepGoing = false }
   return { ctx, calls, execute: () => new VibeAppScanner().execute.call(ctx) };
 }
 
-test('package exposes only the VAS node and masked credential; publication is disabled', () => {
+test('package exposes only the VAS node and masked credential; publication is guarded', () => {
   const pkg = require('../package.json');
-  assert.equal(pkg.private, true); assert.equal(pkg.license, 'MIT');
-  assert.match(pkg.scripts.prepublishOnly, /throw new Error/); assert.equal(pkg.scripts.release, undefined);
+  assert.equal(pkg.private, false); assert.equal(pkg.license, 'MIT');
+  assert.equal(pkg.scripts.prepublishOnly, 'node scripts/release-guard.cjs'); assert.equal(pkg.scripts.release, undefined);
   assert.equal(pkg.dependencies, undefined);
   assert.deepEqual(pkg.n8n.nodes, ['dist/nodes/VibeAppScanner/VibeAppScanner.node.js']);
   assert.deepEqual(pkg.n8n.credentials, ['dist/credentials/VibeAppScannerApi.credentials.js']);
